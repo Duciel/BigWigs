@@ -81,7 +81,7 @@ local timer = {
 	nextEmerge = 90,
 
 	knockbackCd = 25, --supposed to be 25,30
-	knockbackSoon = 8,
+	knockbackSoon = 5, --server urand(25,30); logs 27.6 - 29.6 (timer pauses while submerged)
 }
 local icon = {
 	domoStart = "inv_misc_pocketwatch_01",

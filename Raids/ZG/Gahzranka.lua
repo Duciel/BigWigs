@@ -106,11 +106,17 @@ L:RegisterTranslations("zhCN", function() return {
     bar_slam = "击退 -冷却",
 } end )
 local timer = {
+	--server: Frost Breath 8s after pull, then urand(8,20)s cast-to-cast (logs: 9.7 - 19.1)
+	frostbreathFirstCd = 8,
 	frostbreathCast = 2,
-	frostbreathCd = 7,--9 -2sec for cast = 7 (need more data)
+	frostbreathCd = {6,18},--{8,20} minus 2s cast
+	--server: Massive Geyser 25s after pull, then urand(16,24)s
+	geyserFirstCd = 25,
 	geyserCast = 1.5,
-	geyserCd = 19,
-	slam = 15,--need more data
+	geyserCd = {14.5,22.5},--{16,24} minus 1.5s cast
+	--server: Slam 17s after pull, then urand(12,20)s (logs: 14.1 - 17.1)
+	slamFirstCd = 17,
+	slam = {12,20},
 }
 local icon = {
 	frostbreath = "spell_frost_frostnova",--Inflicts Frost damage to enemies in a cone in front of the caster, stealing their mana and reducing their movement speed for 10 sec.
@@ -138,6 +144,25 @@ function module:OnEnable()
 	self:RegisterEvent("CHAT_MSG_SPELL_CREATURE_VS_CREATURE_DAMAGE", "Event")--trigger_slam, trigger_frostbreath, trigger_geyserBegin, trigger_geyserCast
 	
 	--self:RegisterEvent("PLAYER_REGEN_DISABLED", "CheckForEngage")
+end
+
+function module:OnSetup()
+	self.started = nil
+end
+
+function module:OnEngage()
+	if self.db.profile.frostbreath then
+		self:Bar(L["bar_frostbreathCd"], timer.frostbreathFirstCd, icon.frostbreath, true, color.frostbreathCd)
+	end
+	if self.db.profile.geyser then
+		self:Bar(L["bar_geyserCd"], timer.geyserFirstCd, icon.geyser, true, color.geyserCd)
+	end
+	if self.db.profile.slam then
+		self:Bar(L["bar_slam"], timer.slamFirstCd, icon.slam, true, color.slam)
+	end
+end
+
+function module:OnDisengage()
 end
 
 function module:Event(msg)
@@ -191,7 +216,7 @@ function module:Frostbreath()
 	self:RemoveBar(L["bar_frostbreathCd"])
 	self:Bar(L["bar_frostbreathCast"], timer.frostbreathCast, icon.frostbreath, true, color.frostbreathCast)
 	self:Message(L["msg_frostbreathCast"])
-	self:DelayedBar(timer.frostbreathCast, L["bar_frostbreathCd"], timer.frostbreathCd, icon.frostbreath, true, color.frostbreathCd)
+	self:DelayedIntervalBar(timer.frostbreathCast, L["bar_frostbreathCd"], timer.frostbreathCd[1], timer.frostbreathCd[2], icon.frostbreath, true, color.frostbreathCd)
 end
 
 function module:GeyserBegin()
@@ -202,9 +227,9 @@ end
 
 function module:GeyserCast()
 	self:RemoveBar(L["bar_geyserCast"])
-	self:Bar(L["bar_geyserCd"], timer.geyserCd, icon.geyser, true, color.geyserCd)
+	self:IntervalBar(L["bar_geyserCd"], timer.geyserCd[1], timer.geyserCd[2], icon.geyser, true, color.geyserCd)
 end
 
 function module:Slam()
-	self:Bar(L["bar_slam"], timer.slam, icon.slam, true, color.slam)
+	self:IntervalBar(L["bar_slam"], timer.slam[1], timer.slam[2], icon.slam, true, color.slam)
 end

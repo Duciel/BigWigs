@@ -1,0 +1,253 @@
+From cbae81c721aa944a0e41f38327824db6dc64df27 Mon Sep 17 00:00:00 2001
+From: Hapto <alex-88-3@hotmail.fr>
+Date: Sat, 17 Oct 2026 01:19:08 +0200
+Subject: [PATCH] Refine timers with public OctoWoW Chronicle data
+
+Second pass using ~70 kills per MC/ZG boss, 43 Onyxia kills and 45
+Lower Karazhan clears pulled from Chronicle's external API.
+
+- Shazzrah: later Gates of Shazzrah every 7-21s on OctoWoW (was 30-35)
+- Onyxia: landing roar -> first fear window 16-31s
+- Hazza'rah: sleep repeats every ~23-25s on OctoWoW
+- Thekal: Force Punch 16-20s
+- Mandokir: first charge at 14s
+- Araxxna: volley interval bars
+- Lord Blackwald II: Reaver Storm 6.5-14s
+- Moroes: first Glittering Dust 21-26s
+- Grizikil: new "Next Flamewave" bar (first 30-33s, then 27-32s)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WJLQrM2ob1poW3peUyML4T
+---
+ Raids/Karazhan/BroodQueenAraxxna.lua |  7 ++++---
+ Raids/Karazhan/Grizikil.lua          | 10 +++++++++-
+ Raids/Karazhan/LordBlackwaldII.lua   |  4 ++--
+ Raids/Karazhan/Moroes.lua            |  4 ++--
+ Raids/MC/Shazzrah.lua                | 12 +++++++-----
+ Raids/Onyxia/Onyxia.lua              |  4 ++--
+ Raids/ZG/Hazzarah.lua                |  4 ++--
+ Raids/ZG/Mandokir.lua                |  2 +-
+ Raids/ZG/Thekal.lua                  |  2 +-
+ 9 files changed, 30 insertions(+), 19 deletions(-)
+
+diff --git a/Raids/Karazhan/BroodQueenAraxxna.lua b/Raids/Karazhan/BroodQueenAraxxna.lua
+index 74ddc95..534626c 100644
+--- a/Raids/Karazhan/BroodQueenAraxxna.lua
++++ b/Raids/Karazhan/BroodQueenAraxxna.lua
+@@ -77,7 +77,8 @@ L:RegisterTranslations("zhCN", function() return {
+ 	you = "you",
+ } end )
+ local timer = {
+-	volley = 8,
++	volleyFirst = {8.5,10.5}, --public logs: first cast 8.7 - 10.6 (p10-p90, 45 kills)
++	volley = {8,10.5}, --after the hit; cast-to-cast 9.3 - 11.7 with a 1.5s cast
+ 	leechingBite = 10,
+ 	eggHatch = 20,
+ }
+@@ -127,7 +128,7 @@ end
+ 
+ function module:OnEngage()
+ 	if self.db.profile.volley then
+-		self:Bar(L["bar_volley"], timer.volley, icon.volley, true, color.volley)
++		self:IntervalBar(L["bar_volley"], timer.volleyFirst[1], timer.volleyFirst[2], icon.volley, true, color.volley)
+ 	end
+ end
+ 
+@@ -176,7 +177,7 @@ end
+ 
+ 
+ function module:Volley()
+-	self:Bar(L["bar_volley"], timer.volley, icon.volley, true, color.volley)
++	self:IntervalBar(L["bar_volley"], timer.volley[1], timer.volley[2], icon.volley, true, color.volley)
+ 	
+ 	if UnitClass("Player") == "Shaman" then
+ 		self:WarningSign(icon.volley, 0.7)
+diff --git a/Raids/Karazhan/Grizikil.lua b/Raids/Karazhan/Grizikil.lua
+index 69eebc7..aa92cb6 100644
+--- a/Raids/Karazhan/Grizikil.lua
++++ b/Raids/Karazhan/Grizikil.lua
+@@ -28,6 +28,7 @@ L:RegisterTranslations("enUS", function() return {
+ 	trigger_flamewave = "Grizikil is afflicted by Flamewave.",--CHAT_MSG_SPELL_PERIODIC_CREATURE_DAMAGE
+ 	trigger_flamewaveFade = "Flamewave fades from Grizikil.",--CHAT_MSG_SPELL_AURA_GONE_OTHER
+ 	bar_flamewave = "Flamewave",
++	bar_flamewaveCd = "Next Flamewave",
+ 	msg_flamewave = "Flamewave, melee run out!",
+ 	
+ 	trigger_yellSmt = "You-you-you no defeat me, I am strong!",--CHAT_MSG_MONSTER_YELL
+@@ -69,13 +70,16 @@ L:RegisterTranslations("zhCN", function() return {
+ } end )
+ local timer = {
+ 	flamewave = 9,
++	flamewaveFirstCd = {30,33}, --public logs: first Flamewave 30.0 - 32.7 (p10-p90, 45 kills)
++	flamewaveCd = {27,32}, --public logs: 27.2 - 32.1
+ }
+ local icon = {
+ 	rainOfFire = "spell_shadow_rainoffire",
+ 	flamewave = "spell_fire_incinerate",
+ }
+ local color = {
+-	flamewave = "Red"
++	flamewave = "Red",
++	flamewaveCd = "Orange",
+ }
+ local syncName = {
+ 	flamewave = "GrizikilFlamewave"..module.revision,
+@@ -103,6 +107,9 @@ function module:OnSetup()
+ end
+ 
+ function module:OnEngage()
++	if self.db.profile.flamewave then
++		self:IntervalBar(L["bar_flamewaveCd"], timer.flamewaveFirstCd[1], timer.flamewaveFirstCd[2], icon.flamewave, true, color.flamewaveCd)
++	end
+ end
+ 
+ function module:OnDisengage()
+@@ -140,6 +147,7 @@ end
+ 
+ function module:Flamewave()
+ 	self:Bar(L["bar_flamewave"], timer.flamewave, icon.flamewave, true, color.flamewave)
++	self:IntervalBar(L["bar_flamewaveCd"], timer.flamewaveCd[1], timer.flamewaveCd[2], icon.flamewave, true, color.flamewaveCd)
+ 	self:Message(L["msg_flamewave"], "Urgent", false, nil, false)
+ 	self:WarningSign(icon.flamewave, 1)
+ 	self:Sound("Beware")
+diff --git a/Raids/Karazhan/LordBlackwaldII.lua b/Raids/Karazhan/LordBlackwaldII.lua
+index b387e2c..ef70d53 100644
+--- a/Raids/Karazhan/LordBlackwaldII.lua
++++ b/Raids/Karazhan/LordBlackwaldII.lua
+@@ -96,7 +96,7 @@ L:RegisterTranslations("zhCN", function() return {
+     you = "you",
+ } end )
+ local timer = {
+-	reaverstormCd = 5.5,
++	reaverstormCd = {5,12.5}, --public logs: cast-to-cast 6.6 - 14.1 (p10-p90), minus 1.5s cast
+ 	reaverstormCast = 1.5,
+ 	boon = 15,--timer TBD
+ 	empoweredSoul = 10,
+@@ -216,7 +216,7 @@ end
+ function module:Reaverstorm()
+ 	self:RemoveBar(L["bar_reaverstormCd"])
+ 	self:Bar(L["bar_reaverstormCast"], timer.reaverstormCast, icon.reaverstorm, true, color.reaverstormCast)
+-	self:DelayedBar(timer.reaverstormCast, L["bar_reaverstormCd"], timer.reaverstormCd, icon.reaverstorm, true, color.reaverstormCd)
++	self:DelayedIntervalBar(timer.reaverstormCast, L["bar_reaverstormCd"], timer.reaverstormCd[1], timer.reaverstormCd[2], icon.reaverstorm, true, color.reaverstormCd)
+ end
+ 
+ function module:Boon(rest)
+diff --git a/Raids/Karazhan/Moroes.lua b/Raids/Karazhan/Moroes.lua
+index ad02c26..7ab61a3 100644
+--- a/Raids/Karazhan/Moroes.lua
++++ b/Raids/Karazhan/Moroes.lua
+@@ -136,7 +136,7 @@ local timer = {
+ 	reflect = 5,
+ 	shuffleKick = 4,
+ 	dust = 10,
+-	dust_cd = 20, -- 20-26
++	dust_cd = {21,26}, -- public logs: first Glittering Dust 21.1 - 25.7 (p10-p90, 46 kills)
+ }
+ local icon = {
+ 	p1 = "Inv_Misc_Pocketwatch_01",
+@@ -206,7 +206,7 @@ end
+ 
+ function module:OnEngage()
+ 	if self.db.profile.dust then
+-		self:Bar(L["bar_dust_cd"], timer.dust_cd, icon.dust_cd, true, color.dust)
++		self:IntervalBar(L["bar_dust_cd"], timer.dust_cd[1], timer.dust_cd[2], icon.dust_cd, true, color.dust)
+ 	end
+ end
+ 
+diff --git a/Raids/MC/Shazzrah.lua b/Raids/MC/Shazzrah.lua
+index 12c11d9..1785a98 100644
+--- a/Raids/MC/Shazzrah.lua
++++ b/Raids/MC/Shazzrah.lua
+@@ -62,9 +62,11 @@ local timer = {
+ 	deadenCd = {7,14}, -- saw 7.412, 10.423, supposed to be 7,14
+ 	deadenDur = 30,
+ 
+-	blinkFirstCd = 25, --saw 30, supposed to be 25,30
+-	blinkCd = 30, --supposed to be 30,35
+-	blinkSoon = 5,
++	blinkFirstCd = 25, --public logs: 25.3 - 29.0 (p10-p90, 48 kills)
++	blinkFirstSoon = 5,
++	blinkCd = 7, --OctoWoW: 2nd+ Gate of Shazzrah 5 - 21s after the previous one (median 12.3, 21 samples from public Chronicle logs)
++	blinkCheckDelay = 4, --start watching for the target swap 4s after a blink
++	blinkSoon = 14, --first blink 25-30 uses 5s (see OnEngage), later ones 7-21
+ }
+ local icon = {
+ 	counterspell = "Spell_Frost_IceShock",
+@@ -156,7 +158,7 @@ function module:OnEngage()
+ 		self:Bar(L["bar_blinkCd"], timer.blinkFirstCd, icon.blink, true, color.blinkCd)
+ 		
+ 		self:DelayedSync(timer.blinkFirstCd - 5, syncName.enableCheckBlink)
+-		self:DelayedBar(timer.blinkFirstCd, L["bar_blinkSoon"], timer.blinkSoon, icon.blink, true, color.blinkSoon)
++		self:DelayedBar(timer.blinkFirstCd, L["bar_blinkSoon"], timer.blinkFirstSoon, icon.blink, true, color.blinkSoon)
+ 	end
+ end
+ 
+@@ -309,7 +311,7 @@ function module:Blink()
+ 	self:Message(L["msg_blink"], "Important", false, nil, false)
+ 	self:Sound("Alarm")
+ 		
+-	self:DelayedSync(timer.blinkCd - 5, syncName.enableCheckBlink)
++	self:DelayedSync(timer.blinkCheckDelay, syncName.enableCheckBlink)
+ 	self:DelayedBar(timer.blinkCd, L["bar_blinkSoon"], timer.blinkSoon, icon.blink, true, color.blinkSoon)
+ 	
+ 	shazzTarget = nil
+diff --git a/Raids/Onyxia/Onyxia.lua b/Raids/Onyxia/Onyxia.lua
+index 4799404..883a91e 100644
+--- a/Raids/Onyxia/Onyxia.lua
++++ b/Raids/Onyxia/Onyxia.lua
+@@ -71,8 +71,8 @@ L:RegisterTranslations("zhCN", function() return {
+ } end )
+ local timer = {
+ 	firstFear = 5, --yell -> landing roar (instant, no cast bar) ~5-7s
+-	afterLandingFear = {18,33}, --server: urand(15,30) after the landing roar + ~3s landing (logs 18.9, 29.2)
+-	fear = {15,30}, --server: urand(15,30) cast-to-cast (logs 15.8, 16.0, 17.9, 27.4)
++	afterLandingFear = {16,31}, --landing roar -> first cast fear: 16.4 - 30.7 (48 public kills)
++	fear = {15,30}, --server: urand(15,30) cast-to-cast; public logs 14.9 - 29.8 (133 samples)
+ 	fearCast = 1.5,
+ 	wingbuffet = 1,
+ }
+diff --git a/Raids/ZG/Hazzarah.lua b/Raids/ZG/Hazzarah.lua
+index a44a1e6..9bdc8b8 100644
+--- a/Raids/ZG/Hazzarah.lua
++++ b/Raids/ZG/Hazzarah.lua
+@@ -74,9 +74,9 @@ L:RegisterTranslations("zhCN", function() return {
+ } end )
+ local timer = {
+ 	firstAdds = {18,23}, --server urand(10,18) but logs show 20.0 / 22.1 on OctoWoW
+-	adds = {15,25}, --server urand(15,25) (logs 20.3)
++	adds = {18,25}, --server urand(15,25); public logs 20.8 - 23.4
+ 	firstSleepCd = {10,18}, --server urand(10,18) (logs 13.7 / 14.1)
+-	sleepCd = {6,14}, --server urand(12,20) minus 6sec afflic (Sleep is instant)
++	sleepCd = {17,19}, --OctoWoW: 23.2 - 23.7s cast-to-cast in public logs (server script says 12-20), minus 6sec afflic
+ 	sleepAfflic = 6,
+ 	chainBurn = 60,
+ }
+diff --git a/Raids/ZG/Mandokir.lua b/Raids/ZG/Mandokir.lua
+index afefda3..2689263 100644
+--- a/Raids/ZG/Mandokir.lua
++++ b/Raids/ZG/Mandokir.lua
+@@ -144,7 +144,7 @@ local timer = {
+ 	whirlwindCast = 2,
+ 	whirlwindCd = {17,20}, --after the 2s cast; logs cast-to-cast 19.0 - 22.1 (median 20.9)
+ 	
+-	chargeFirstCd = 15.8,
++	chargeFirstCd = 14, --public logs: 13.1 - 14.7 (p10-p90, 72 kills)
+ 	chargeCd = {30,35},
+ 	
+ 	enrage = 90,
+diff --git a/Raids/ZG/Thekal.lua b/Raids/ZG/Thekal.lua
+index e3e7bcc..325d7b8 100644
+--- a/Raids/ZG/Thekal.lua
++++ b/Raids/ZG/Thekal.lua
+@@ -336,7 +336,7 @@ local timer = {
+ 	phase2 = 15, --15sec from thekal's death, not from all 3 dead
+ 	
+ 	forcePunchFirst = 5,
+-	forcePunch = {12,18}, --saw 12,18
++	forcePunch = {16,20}, --server urand(16,21); public logs 16.5 - 19.4 (p10-p90, 17 samples)
+ 	charge = {12,18}, --saw 13,15,18
+ 	frenzy = 10, --is 8 or 10 depending on bosses
+ 	addsFirst = 25,
+-- 
+2.43.0
+

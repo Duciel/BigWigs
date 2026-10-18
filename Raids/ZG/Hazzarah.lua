@@ -73,13 +73,11 @@ L:RegisterTranslations("zhCN", function() return {
     c_nightmareillusion = "梦魇幻象",
 } end )
 local timer = {
-	firstAdds = 21,
-	adds = 24,
-	
-	firstSleepCd = 10,
-	sleepCd = 18, --24 - 6sec afflic
+	firstAdds = {18,23}, --server urand(10,18) but logs show 20.0 / 22.1 on OctoWoW
+	adds = {18,25}, --server urand(15,25); public logs 20.8 - 23.4
+	firstSleepCd = {10,18}, --server urand(10,18) (logs 13.7 / 14.1)
+	sleepCd = {17,19}, --OctoWoW: 23.2 - 23.7s cast-to-cast in public logs (server script says 12-20), minus 6sec afflic
 	sleepAfflic = 6,
-	
 	chainBurn = 60,
 }
 local icon = {
@@ -140,11 +138,11 @@ function module:OnEngage()
 	addDeadCounter = 0
 	
 	if self.db.profile.sleep then
-		self:Bar(L["bar_sleepCd"], timer.firstSleepCd, icon.sleep, true, color.sleep)
+		self:IntervalBar(L["bar_sleepCd"], timer.firstSleepCd[1], timer.firstSleepCd[2], icon.sleep, true, color.sleep)
 	end
 	
 	if self.db.profile.adds then
-		self:Bar(L["bar_adds"], timer.firstAdds, icon.adds, true, color.adds)
+		self:IntervalBar(L["bar_adds"], timer.firstAdds[1], timer.firstAdds[2], icon.adds, true, color.adds)
 	end
 end
 
@@ -186,7 +184,7 @@ end
 function module:AddsSpawn()
 	self:RemoveBar(L["bar_adds"])
 	
-	self:Bar(L["bar_adds"], timer.adds, icon.adds, true, color.adds)
+	self:IntervalBar(L["bar_adds"], timer.adds[1], timer.adds[2], icon.adds, true, color.adds)
 	self:Message(L["msg_addsSpawn"], "Urgent", false, nil, false)
 	
 	self:TriggerEvent("BigWigs_StartCounterBar", self, L["bar_addsCounter"], 3, "Interface\\Icons\\"..icon.adds, true, color.addsCounter)
@@ -218,7 +216,7 @@ function module:Sleep()
 		self:WarningSign(icon.tremor, 1)
 	end
 	
-	self:DelayedBar(timer.sleepAfflic, L["bar_sleepCd"], timer.sleepCd, icon.sleep, true, color.sleep)
+	self:DelayedIntervalBar(timer.sleepAfflic, L["bar_sleepCd"], timer.sleepCd[1], timer.sleepCd[2], icon.sleep, true, color.sleep)
 end
 
 function module:ChainBurn()

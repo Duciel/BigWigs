@@ -65,13 +65,13 @@ L:RegisterTranslations("enUS", function() return {
 
 local timer = {
 	handOfRagnarosFirstCd = 6,
-	handOfRagnarosCd = 10, --12 - 2
+	handOfRagnarosCd = {10,13}, --server urand(12,15) minus 2s; logs 12.9 - 14.4
 	handOfRagnarosDur = 2,
 	
 	darkMendingCast = 2,
 	
 	flameSpearFirstCd = 2,
-	flameSpearCd = {12,16},
+	flameSpearCd = {11,15}, --server urand(12,16) cast-to-cast, minus 1s cast
 	flameSpearCast = 1,
 	
 	inspireDur = 10,
@@ -225,7 +225,7 @@ function module:HandOfRagnaros()
 	self:RemoveBar(L["bar_handOfRagnarosCd"])
 	
 	self:Bar(L["bar_handOfRagnarosDur"], timer.handOfRagnarosDur, icon.handOfRagnaros, true, color.handOfRagnarosDur)
-	self:DelayedBar(timer.handOfRagnarosDur, L["bar_handOfRagnarosCd"], timer.handOfRagnarosCd, icon.handOfRagnaros, true, color.handOfRagnarosCd)
+	self:DelayedIntervalBar(timer.handOfRagnarosDur, L["bar_handOfRagnarosCd"], timer.handOfRagnarosCd[1], timer.handOfRagnarosCd[2], icon.handOfRagnaros, true, color.handOfRagnarosCd)
 end
 
 function module:DarkMending()

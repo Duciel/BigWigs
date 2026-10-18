@@ -28,6 +28,7 @@ L:RegisterTranslations("enUS", function() return {
 	trigger_flamewave = "Grizikil is afflicted by Flamewave.",--CHAT_MSG_SPELL_PERIODIC_CREATURE_DAMAGE
 	trigger_flamewaveFade = "Flamewave fades from Grizikil.",--CHAT_MSG_SPELL_AURA_GONE_OTHER
 	bar_flamewave = "Flamewave",
+	bar_flamewaveCd = "Next Flamewave",
 	msg_flamewave = "Flamewave, melee run out!",
 	
 	trigger_yellSmt = "You-you-you no defeat me, I am strong!",--CHAT_MSG_MONSTER_YELL
@@ -69,13 +70,16 @@ L:RegisterTranslations("zhCN", function() return {
 } end )
 local timer = {
 	flamewave = 9,
+	flamewaveFirstCd = {30,33}, --public logs: first Flamewave 30.0 - 32.7 (p10-p90, 45 kills)
+	flamewaveCd = {27,32}, --public logs: 27.2 - 32.1
 }
 local icon = {
 	rainOfFire = "spell_shadow_rainoffire",
 	flamewave = "spell_fire_incinerate",
 }
 local color = {
-	flamewave = "Red"
+	flamewave = "Red",
+	flamewaveCd = "Orange",
 }
 local syncName = {
 	flamewave = "GrizikilFlamewave"..module.revision,
@@ -103,6 +107,9 @@ function module:OnSetup()
 end
 
 function module:OnEngage()
+	if self.db.profile.flamewave then
+		self:IntervalBar(L["bar_flamewaveCd"], timer.flamewaveFirstCd[1], timer.flamewaveFirstCd[2], icon.flamewave, true, color.flamewaveCd)
+	end
 end
 
 function module:OnDisengage()
@@ -140,6 +147,7 @@ end
 
 function module:Flamewave()
 	self:Bar(L["bar_flamewave"], timer.flamewave, icon.flamewave, true, color.flamewave)
+	self:IntervalBar(L["bar_flamewaveCd"], timer.flamewaveCd[1], timer.flamewaveCd[2], icon.flamewave, true, color.flamewaveCd)
 	self:Message(L["msg_flamewave"], "Urgent", false, nil, false)
 	self:WarningSign(icon.flamewave, 1)
 	self:Sound("Beware")

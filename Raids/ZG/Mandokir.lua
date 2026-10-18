@@ -142,9 +142,9 @@ local timer = {
 	
 	whirlwindFirstCd = 20,
 	whirlwindCast = 2,
-	whirlwindCd = 18,
+	whirlwindCd = {17,20}, --after the 2s cast; logs cast-to-cast 19.0 - 22.1 (median 20.9)
 	
-	chargeFirstCd = 15.8,
+	chargeFirstCd = 14, --public logs: 13.1 - 14.7 (p10-p90, 72 kills)
 	chargeCd = {30,35},
 	
 	enrage = 90,
@@ -375,7 +375,7 @@ function module:Whirlwind()
 	
 	self:Bar(L["bar_whirlwindCast"], timer.whirlwindCast, icon.whirlwind, true, color.whirlwindCast)
 	
-	self:DelayedBar(timer.whirlwindCast, L["bar_whirlwindCd"], timer.whirlwindCd, icon.whirlwind, true, color.whirlwindCd)
+	self:DelayedIntervalBar(timer.whirlwindCast, L["bar_whirlwindCd"], timer.whirlwindCd[1], timer.whirlwindCd[2], icon.whirlwind, true, color.whirlwindCd)
 end
 
 function module:Charge()

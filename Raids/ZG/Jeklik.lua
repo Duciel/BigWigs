@@ -181,19 +181,20 @@ L:RegisterTranslations("zhCN", function() return {
 } end )
 local timer = {
 	healCast = 4,
-	healCd = 20,--need data
+	healFirstCd = 20,--server: first Great Heal 20s after phase 2 starts (logs 20.0 - 20.3)
+	healCd = {20,25},--server urand(20,25)
 
-	firstTerrifyingScreechCd = 18,--need data
-	terrifyingScreechCd = 30,--need data
+	firstTerrifyingScreechCd = 12,--server: 12s after phase 2 starts (logs 11.9 - 12.0); no Screech in phase 1
+	terrifyingScreechCd = 30,--server: 30s
 	psychicScreamCd = 39.5,--need data
 	
 	mindflay = 25,--need data
 	
 	firstSilence = 12,--need data
-	silenceCd = 10,--20cd -10afflicted
+	silenceCd = {10,14},--server urand(20,24) - 10 afflicted (logs 20.2)
 	silenceAfflicted = 10,
 	
-	swarm = 45,--need data
+	swarm = 40,--server: first bat swarm 40s after pull (phase 1 only), then 65s
 }
 local icon = {
 	heal = "Spell_Holy_Heal",
@@ -285,10 +286,6 @@ function module:OnEngage()
 	castingHeal = nil
 	castingMindFlay = nil
 	
-	if self.db.profile.fear then
-		self:Bar(L["bar_fearCd"], timer.firstTerrifyingScreechCd, icon.terrifyingScreech, true, color.fearCd)
-	end
-	
 	if self.db.profile.silence then
 		self:Bar(L["bar_silenceCd"], timer.firstSilence, icon.silence, true, color.silenceCd)
 	end
@@ -375,7 +372,9 @@ end
 
 function module:Heal()
 	castingHeal = true
+	self:RemoveBar(L["bar_healCd"])
 	self:Bar(L["bar_healCast"], timer.healCast, icon.heal, true, color.healCast)
+	self:IntervalBar(L["bar_healCd"], timer.healCd[1], timer.healCd[2], icon.heal, true, color.healCd)
 	self:Message(L["msg_healCast"], "Positive", false, nil, false)
 	
 	if UnitClass("Player") == "Mage" then
@@ -434,7 +433,7 @@ end
 
 function module:Silence()
 	self:Bar(L["bar_silenceAfflicted"], timer.silenceAfflicted, icon.silence, true, color.silenceAfflicted)
-	self:DelayedBar(timer.silenceAfflicted, L["bar_silenceCd"], timer.silenceCd, icon.silence, true, color.silenceCd)
+	self:DelayedIntervalBar(timer.silenceAfflicted, L["bar_silenceCd"], timer.silenceCd[1], timer.silenceCd[2], icon.silence, true, color.silenceCd)
 end
 
 function module:Swarm()
@@ -453,5 +452,13 @@ function module:Phase()
 		self:RemoveBar(L["bar_swam"])
 		
 		self:CancelDelayedBar(L["bar_silenceCd"])
+	end
+	
+	-- phase 2 timers restart when she lands (server values, confirmed by logs)
+	if self.db.profile.fear then
+		self:Bar(L["bar_fearCd"], timer.firstTerrifyingScreechCd, icon.terrifyingScreech, true, color.fearCd)
+	end
+	if self.db.profile.heal then
+		self:Bar(L["bar_healCd"], timer.healFirstCd, icon.heal, true, color.healCd)
 	end
 end

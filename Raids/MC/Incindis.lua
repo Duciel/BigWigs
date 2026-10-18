@@ -17,17 +17,21 @@ L:RegisterTranslations("enUS", function() return {
 
 	trigger_quakingStomp = "Incindis's Quaking Stomp hits (.+) for",
 	bar_fireNova = "Fire Nova!",
+	bar_stompCd = "Next Quaking Stomp + Fire Nova",
 	msg_fireNova = "FIRE NOVA - RUN AWAY!",
 } end)
 
 local timer = {
-	fireNova = 5.5,
+	fireNova = 5.5, --logs: Fire Nova lands 5.4 - 5.6s after Quaking Stomp
+	stompFirstCd = {24,30}, --server: urand(24,30) after pull (logs 29.6, 30.7)
+	stompCd = {24,30}, --server: urand(24,30) (logs 24.0, 34.6 incl. cast delays)
 }
 local icon = {
 	fireNova = "spell_fire_selfdestruct",
 }
 local color = {
 	fireNova = "Red",
+	stompCd = "Orange",
 }
 local syncName = {
 	quakingStomp = "IncindisQuakingStomp"..module.revision,
@@ -45,6 +49,9 @@ function module:OnSetup()
 end
 
 function module:OnEngage()
+	if self.db.profile.firenova then
+		self:IntervalBar(L["bar_stompCd"], timer.stompFirstCd[1], timer.stompFirstCd[2], icon.fireNova, true, color.stompCd)
+	end
 end
 
 function module:OnDisengage()
@@ -69,6 +76,7 @@ function module:QuakingStomp()
 	self:Bar(L["bar_fireNova"], timer.fireNova, icon.fireNova, true, color.fireNova)
 	self:Sound("RunAway")
 	self:WarningSign(icon.fireNova, timer.fireNova)
+	self:IntervalBar(L["bar_stompCd"], timer.stompCd[1], timer.stompCd[2], icon.fireNova, true, color.stompCd)
 end
 
 function module:Test()

@@ -65,6 +65,7 @@ Plugins\Sound.lua
 Plugins\RaidWarn.lua
 Plugins\BossBlock.lua
 Plugins\RaidIcon.lua
+Plugins\WorldMarkers.lua
 Plugins\Range.lua
 Plugins\CommonAuras.lua
 Plugins\Version.lua

@@ -70,8 +70,9 @@ L:RegisterTranslations("zhCN", function() return {
 	fireball_cast = "火球目标 %s",
 } end )
 local timer = {
-	firstFear = 5,
-	fear = 15,
+	firstFear = 5, --yell -> landing roar (instant, no cast bar) ~5-7s
+	afterLandingFear = {16,31}, --landing roar -> first cast fear: 16.4 - 30.7 (48 public kills)
+	fear = {15,30}, --server: urand(15,30) cast-to-cast; public logs 14.9 - 29.8 (133 samples)
 	fearCast = 1.5,
 	wingbuffet = 1,
 }
@@ -380,6 +381,8 @@ function module:Phase3()
 	if self.db.profile.phase and phase < 3 then
 		self:Message(L["phase3text"], "Important", true, "Beware")
 		self:Bar(L["fear_next"], timer.firstFear + timer.fearCast, icon.fear, true, "blue")
+		-- the landing roar is instant (no 'begins to cast'), so chain the next fear window from it
+		self:DelayedIntervalBar(timer.firstFear + timer.fearCast, L["fear_next"], timer.afterLandingFear[1], timer.afterLandingFear[2], icon.fear, true, "blue")
 		phase = 3
 	end
 end
@@ -424,10 +427,11 @@ end
 function module:Fear()
 	if self.db.profile.onyfear then
 		self:RemoveBar(L["fear_next"]) -- remove timer bar
+		self:CancelDelayedBar(L["fear_next"])
 
 		self:Message(L["feartext"], "Important", true, "Alarm")
 		self:Bar(L["fear_cast"], timer.fearCast, icon.fear, true, "white") -- add cast bar
-		self:DelayedBar(timer.fearCast, L["fear_next"], timer.fear, icon.fear, true, "blue") -- delayed timer bar
+		self:DelayedIntervalBar(timer.fearCast, L["fear_next"], timer.fear[1] - timer.fearCast, timer.fear[2] - timer.fearCast, icon.fear, true, "blue") -- delayed timer bar
 		self:WarningSign(icon.fear, 5)
 	end
 end

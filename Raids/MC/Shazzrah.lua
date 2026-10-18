@@ -62,9 +62,11 @@ local timer = {
 	deadenCd = {7,14}, -- saw 7.412, 10.423, supposed to be 7,14
 	deadenDur = 30,
 
-	blinkFirstCd = 25, --saw 30, supposed to be 25,30
-	blinkCd = 30, --supposed to be 30,35
-	blinkSoon = 5,
+	blinkFirstCd = 25, --public logs: 25.3 - 29.0 (p10-p90, 48 kills)
+	blinkFirstSoon = 5,
+	blinkCd = 7, --OctoWoW: 2nd+ Gate of Shazzrah 5 - 21s after the previous one (median 12.3, 21 samples from public Chronicle logs)
+	blinkCheckDelay = 4, --start watching for the target swap 4s after a blink
+	blinkSoon = 14, --first blink 25-30 uses 5s (see OnEngage), later ones 7-21
 }
 local icon = {
 	counterspell = "Spell_Frost_IceShock",
@@ -156,7 +158,7 @@ function module:OnEngage()
 		self:Bar(L["bar_blinkCd"], timer.blinkFirstCd, icon.blink, true, color.blinkCd)
 		
 		self:DelayedSync(timer.blinkFirstCd - 5, syncName.enableCheckBlink)
-		self:DelayedBar(timer.blinkFirstCd, L["bar_blinkSoon"], timer.blinkSoon, icon.blink, true, color.blinkSoon)
+		self:DelayedBar(timer.blinkFirstCd, L["bar_blinkSoon"], timer.blinkFirstSoon, icon.blink, true, color.blinkSoon)
 	end
 end
 
@@ -309,7 +311,7 @@ function module:Blink()
 	self:Message(L["msg_blink"], "Important", false, nil, false)
 	self:Sound("Alarm")
 		
-	self:DelayedSync(timer.blinkCd - 5, syncName.enableCheckBlink)
+	self:DelayedSync(timer.blinkCheckDelay, syncName.enableCheckBlink)
 	self:DelayedBar(timer.blinkCd, L["bar_blinkSoon"], timer.blinkSoon, icon.blink, true, color.blinkSoon)
 	
 	shazzTarget = nil

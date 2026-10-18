@@ -77,7 +77,8 @@ L:RegisterTranslations("zhCN", function() return {
 	you = "you",
 } end )
 local timer = {
-	volley = 8,
+	volleyFirst = {8.5,10.5}, --public logs: first cast 8.7 - 10.6 (p10-p90, 45 kills)
+	volley = {8,10.5}, --after the hit; cast-to-cast 9.3 - 11.7 with a 1.5s cast
 	leechingBite = 10,
 	eggHatch = 20,
 }
@@ -127,7 +128,7 @@ end
 
 function module:OnEngage()
 	if self.db.profile.volley then
-		self:Bar(L["bar_volley"], timer.volley, icon.volley, true, color.volley)
+		self:IntervalBar(L["bar_volley"], timer.volleyFirst[1], timer.volleyFirst[2], icon.volley, true, color.volley)
 	end
 end
 
@@ -176,7 +177,7 @@ end
 
 
 function module:Volley()
-	self:Bar(L["bar_volley"], timer.volley, icon.volley, true, color.volley)
+	self:IntervalBar(L["bar_volley"], timer.volley[1], timer.volley[2], icon.volley, true, color.volley)
 	
 	if UnitClass("Player") == "Shaman" then
 		self:WarningSign(icon.volley, 0.7)

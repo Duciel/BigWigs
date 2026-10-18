@@ -1,0 +1,512 @@
+From 949dfb2f53038f4694dc664c12bd664fe56163da Mon Sep 17 00:00:00 2001
+From: Hapto <alex-88-3@hotmail.fr>
+Date: Sat, 17 Oct 2026 00:25:35 +0200
+Subject: [PATCH] Tune MC/Onyxia/ZG timers from server scripts and combat logs
+
+Timers cross-checked against tortoise-wow boss scripts and Chronicle
+combat logs from OctoWoW (5 ZG clears, 2 MC clears, 2 Onyxia kills).
+Fixed timers replaced by interval bars where the server uses urand().
+
+- Lucifron: Shadow Shock every 6s (was 10-20s)
+- Sulfuron: Hand of Ragnaros / Flame Spear intervals
+- Ragnaros: Wrath window 25-30s
+- Incindis: next Quaking Stomp + Fire Nova bar
+- Onyxia: P3 fear 15-30s interval, chain from instant landing roar
+- Gahz'ranka: engage bars + interval cooldowns
+- Jeklik: no P1 fear bar; P2 Screech 12s / Great Heal 20s; silence 20-24s
+- Hakkar: Cause Insanity CD counted from cast (20-25s)
+- Hazza'rah: sleep/illusion intervals
+- Jin'do: Brain Wash Totem / Healing Ward bars
+- Mandokir: whirlwind interval
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WJLQrM2ob1poW3peUyML4T
+---
+ Raids/MC/Incindis.lua   | 10 +++++++++-
+ Raids/MC/Lucifron.lua   |  4 ++--
+ Raids/MC/Ragnaros.lua   |  2 +-
+ Raids/MC/Sulfuron.lua   |  6 +++---
+ Raids/Onyxia/Onyxia.lua | 10 +++++++---
+ Raids/ZG/Gahzranka.lua  | 37 +++++++++++++++++++++++++++++++------
+ Raids/ZG/Hakkar.lua     | 19 ++++++++++++++++---
+ Raids/ZG/Hazzarah.lua   | 18 ++++++++----------
+ Raids/ZG/Jeklik.lua     | 27 +++++++++++++++++----------
+ Raids/ZG/Jindo.lua      | 16 ++++++++++++++++
+ Raids/ZG/Mandokir.lua   |  4 ++--
+ 11 files changed, 112 insertions(+), 41 deletions(-)
+
+diff --git a/Raids/MC/Incindis.lua b/Raids/MC/Incindis.lua
+index d3e5b58..d19c6c0 100644
+--- a/Raids/MC/Incindis.lua
++++ b/Raids/MC/Incindis.lua
+@@ -17,17 +17,21 @@ L:RegisterTranslations("enUS", function() return {
+ 
+ 	trigger_quakingStomp = "Incindis's Quaking Stomp hits (.+) for",
+ 	bar_fireNova = "Fire Nova!",
++	bar_stompCd = "Next Quaking Stomp + Fire Nova",
+ 	msg_fireNova = "FIRE NOVA - RUN AWAY!",
+ } end)
+ 
+ local timer = {
+-	fireNova = 5.5,
++	fireNova = 5.5, --logs: Fire Nova lands 5.4 - 5.6s after Quaking Stomp
++	stompFirstCd = {24,30}, --server: urand(24,30) after pull (logs 29.6, 30.7)
++	stompCd = {24,30}, --server: urand(24,30) (logs 24.0, 34.6 incl. cast delays)
+ }
+ local icon = {
+ 	fireNova = "spell_fire_selfdestruct",
+ }
+ local color = {
+ 	fireNova = "Red",
++	stompCd = "Orange",
+ }
+ local syncName = {
+ 	quakingStomp = "IncindisQuakingStomp"..module.revision,
+@@ -45,6 +49,9 @@ function module:OnSetup()
+ end
+ 
+ function module:OnEngage()
++	if self.db.profile.firenova then
++		self:IntervalBar(L["bar_stompCd"], timer.stompFirstCd[1], timer.stompFirstCd[2], icon.fireNova, true, color.stompCd)
++	end
+ end
+ 
+ function module:OnDisengage()
+@@ -69,6 +76,7 @@ function module:QuakingStomp()
+ 	self:Bar(L["bar_fireNova"], timer.fireNova, icon.fireNova, true, color.fireNova)
+ 	self:Sound("RunAway")
+ 	self:WarningSign(icon.fireNova, timer.fireNova)
++	self:IntervalBar(L["bar_stompCd"], timer.stompCd[1], timer.stompCd[2], icon.fireNova, true, color.stompCd)
+ end
+ 
+ function module:Test()
+diff --git a/Raids/MC/Lucifron.lua b/Raids/MC/Lucifron.lua
+index 609fc17..4be3f29 100644
+--- a/Raids/MC/Lucifron.lua
++++ b/Raids/MC/Lucifron.lua
+@@ -73,8 +73,8 @@ local timer = {
+ 	mcCast = 2,
+ 	mc = 15,
+ 	
+-	shadowShockFirstCd = {5,10}, --6
+-	shadowShockCd = {10,20}, --12
++	shadowShockFirstCd = {5,6}, --server: 6s after pull (logs 4.3 - 5.4)
++	shadowShockCd = {6,6.5}, --server: repeats every 6s (logs: 6.0 every time)
+ }
+ local icon = {
+ 	curse = "Spell_Shadow_BlackPlague",
+diff --git a/Raids/MC/Ragnaros.lua b/Raids/MC/Ragnaros.lua
+index 026bcad..d27a236 100644
+--- a/Raids/MC/Ragnaros.lua
++++ b/Raids/MC/Ragnaros.lua
+@@ -81,7 +81,7 @@ local timer = {
+ 	nextEmerge = 90,
+ 
+ 	knockbackCd = 25, --supposed to be 25,30
+-	knockbackSoon = 8,
++	knockbackSoon = 5, --server urand(25,30); logs 27.6 - 29.6 (timer pauses while submerged)
+ }
+ local icon = {
+ 	domoStart = "inv_misc_pocketwatch_01",
+diff --git a/Raids/MC/Sulfuron.lua b/Raids/MC/Sulfuron.lua
+index 72a3c95..52483d8 100644
+--- a/Raids/MC/Sulfuron.lua
++++ b/Raids/MC/Sulfuron.lua
+@@ -65,13 +65,13 @@ L:RegisterTranslations("enUS", function() return {
+ 
+ local timer = {
+ 	handOfRagnarosFirstCd = 6,
+-	handOfRagnarosCd = 10, --12 - 2
++	handOfRagnarosCd = {10,13}, --server urand(12,15) minus 2s; logs 12.9 - 14.4
+ 	handOfRagnarosDur = 2,
+ 	
+ 	darkMendingCast = 2,
+ 	
+ 	flameSpearFirstCd = 2,
+-	flameSpearCd = {12,16},
++	flameSpearCd = {11,15}, --server urand(12,16) cast-to-cast, minus 1s cast
+ 	flameSpearCast = 1,
+ 	
+ 	inspireDur = 10,
+@@ -225,7 +225,7 @@ function module:HandOfRagnaros()
+ 	self:RemoveBar(L["bar_handOfRagnarosCd"])
+ 	
+ 	self:Bar(L["bar_handOfRagnarosDur"], timer.handOfRagnarosDur, icon.handOfRagnaros, true, color.handOfRagnarosDur)
+-	self:DelayedBar(timer.handOfRagnarosDur, L["bar_handOfRagnarosCd"], timer.handOfRagnarosCd, icon.handOfRagnaros, true, color.handOfRagnarosCd)
++	self:DelayedIntervalBar(timer.handOfRagnarosDur, L["bar_handOfRagnarosCd"], timer.handOfRagnarosCd[1], timer.handOfRagnarosCd[2], icon.handOfRagnaros, true, color.handOfRagnarosCd)
+ end
+ 
+ function module:DarkMending()
+diff --git a/Raids/Onyxia/Onyxia.lua b/Raids/Onyxia/Onyxia.lua
+index 50de8d5..4799404 100644
+--- a/Raids/Onyxia/Onyxia.lua
++++ b/Raids/Onyxia/Onyxia.lua
+@@ -70,8 +70,9 @@ L:RegisterTranslations("zhCN", function() return {
+ 	fireball_cast = "火球目标 %s",
+ } end )
+ local timer = {
+-	firstFear = 5,
+-	fear = 15,
++	firstFear = 5, --yell -> landing roar (instant, no cast bar) ~5-7s
++	afterLandingFear = {18,33}, --server: urand(15,30) after the landing roar + ~3s landing (logs 18.9, 29.2)
++	fear = {15,30}, --server: urand(15,30) cast-to-cast (logs 15.8, 16.0, 17.9, 27.4)
+ 	fearCast = 1.5,
+ 	wingbuffet = 1,
+ }
+@@ -380,6 +381,8 @@ function module:Phase3()
+ 	if self.db.profile.phase and phase < 3 then
+ 		self:Message(L["phase3text"], "Important", true, "Beware")
+ 		self:Bar(L["fear_next"], timer.firstFear + timer.fearCast, icon.fear, true, "blue")
++		-- the landing roar is instant (no 'begins to cast'), so chain the next fear window from it
++		self:DelayedIntervalBar(timer.firstFear + timer.fearCast, L["fear_next"], timer.afterLandingFear[1], timer.afterLandingFear[2], icon.fear, true, "blue")
+ 		phase = 3
+ 	end
+ end
+@@ -424,10 +427,11 @@ end
+ function module:Fear()
+ 	if self.db.profile.onyfear then
+ 		self:RemoveBar(L["fear_next"]) -- remove timer bar
++		self:CancelDelayedBar(L["fear_next"])
+ 
+ 		self:Message(L["feartext"], "Important", true, "Alarm")
+ 		self:Bar(L["fear_cast"], timer.fearCast, icon.fear, true, "white") -- add cast bar
+-		self:DelayedBar(timer.fearCast, L["fear_next"], timer.fear, icon.fear, true, "blue") -- delayed timer bar
++		self:DelayedIntervalBar(timer.fearCast, L["fear_next"], timer.fear[1] - timer.fearCast, timer.fear[2] - timer.fearCast, icon.fear, true, "blue") -- delayed timer bar
+ 		self:WarningSign(icon.fear, 5)
+ 	end
+ end
+diff --git a/Raids/ZG/Gahzranka.lua b/Raids/ZG/Gahzranka.lua
+index 2f327f5..e461091 100644
+--- a/Raids/ZG/Gahzranka.lua
++++ b/Raids/ZG/Gahzranka.lua
+@@ -106,11 +106,17 @@ L:RegisterTranslations("zhCN", function() return {
+     bar_slam = "击退 -冷却",
+ } end )
+ local timer = {
++	--server: Frost Breath 8s after pull, then urand(8,20)s cast-to-cast (logs: 9.7 - 19.1)
++	frostbreathFirstCd = 8,
+ 	frostbreathCast = 2,
+-	frostbreathCd = 7,--9 -2sec for cast = 7 (need more data)
++	frostbreathCd = {6,18},--{8,20} minus 2s cast
++	--server: Massive Geyser 25s after pull, then urand(16,24)s
++	geyserFirstCd = 25,
+ 	geyserCast = 1.5,
+-	geyserCd = 19,
+-	slam = 15,--need more data
++	geyserCd = {14.5,22.5},--{16,24} minus 1.5s cast
++	--server: Slam 17s after pull, then urand(12,20)s (logs: 14.1 - 17.1)
++	slamFirstCd = 17,
++	slam = {12,20},
+ }
+ local icon = {
+ 	frostbreath = "spell_frost_frostnova",--Inflicts Frost damage to enemies in a cone in front of the caster, stealing their mana and reducing their movement speed for 10 sec.
+@@ -140,6 +146,25 @@ function module:OnEnable()
+ 	--self:RegisterEvent("PLAYER_REGEN_DISABLED", "CheckForEngage")
+ end
+ 
++function module:OnSetup()
++	self.started = nil
++end
++
++function module:OnEngage()
++	if self.db.profile.frostbreath then
++		self:Bar(L["bar_frostbreathCd"], timer.frostbreathFirstCd, icon.frostbreath, true, color.frostbreathCd)
++	end
++	if self.db.profile.geyser then
++		self:Bar(L["bar_geyserCd"], timer.geyserFirstCd, icon.geyser, true, color.geyserCd)
++	end
++	if self.db.profile.slam then
++		self:Bar(L["bar_slam"], timer.slamFirstCd, icon.slam, true, color.slam)
++	end
++end
++
++function module:OnDisengage()
++end
++
+ function module:Event(msg)
+ 	if msg == L["trigger_frostbreathCast"] then
+ 		self:Sync(syncName.frostbreath)
+@@ -191,7 +216,7 @@ function module:Frostbreath()
+ 	self:RemoveBar(L["bar_frostbreathCd"])
+ 	self:Bar(L["bar_frostbreathCast"], timer.frostbreathCast, icon.frostbreath, true, color.frostbreathCast)
+ 	self:Message(L["msg_frostbreathCast"])
+-	self:DelayedBar(timer.frostbreathCast, L["bar_frostbreathCd"], timer.frostbreathCd, icon.frostbreath, true, color.frostbreathCd)
++	self:DelayedIntervalBar(timer.frostbreathCast, L["bar_frostbreathCd"], timer.frostbreathCd[1], timer.frostbreathCd[2], icon.frostbreath, true, color.frostbreathCd)
+ end
+ 
+ function module:GeyserBegin()
+@@ -202,9 +227,9 @@ end
+ 
+ function module:GeyserCast()
+ 	self:RemoveBar(L["bar_geyserCast"])
+-	self:Bar(L["bar_geyserCd"], timer.geyserCd, icon.geyser, true, color.geyserCd)
++	self:IntervalBar(L["bar_geyserCd"], timer.geyserCd[1], timer.geyserCd[2], icon.geyser, true, color.geyserCd)
+ end
+ 
+ function module:Slam()
+-	self:Bar(L["bar_slam"], timer.slam, icon.slam, true, color.slam)
++	self:IntervalBar(L["bar_slam"], timer.slam[1], timer.slam[2], icon.slam, true, color.slam)
+ end
+diff --git a/Raids/ZG/Hakkar.lua b/Raids/ZG/Hakkar.lua
+index e896d1b..2329dd9 100644
+--- a/Raids/ZG/Hakkar.lua
++++ b/Raids/ZG/Hakkar.lua
+@@ -218,7 +218,7 @@ L:RegisterTranslations("zhCN", function() return {
+ local timer = {
+ 	causeInsanityFirstCd = 17,
+ 	causeInsanityDur = 10,
+-	causeInsanityCd = 11,
++	causeInsanityCd = {20,25}, --server urand(20,25) cast-to-cast (logs 20.4 - 24.3)
+ 
+ 	bloodSiphonCd = 90,
+ 	bloodSiphonDur = 8,
+@@ -536,12 +536,25 @@ function module:BigWigs_RecvSync(sync, rest, nick)
+ 	end
+ end
+ 
++local causeInsanityTime = 0
++function module:CauseInsanityCdBar()
++	-- the cooldown runs from the cast, not from the fade (MC is often broken early)
++	local elapsed = GetTime() - causeInsanityTime
++	local cdMin = timer.causeInsanityCd[1] - elapsed
++	local cdMax = timer.causeInsanityCd[2] - elapsed
++	if cdMax > 0 then
++		if cdMin < 0.1 then cdMin = 0.1 end
++		self:IntervalBar(L["bar_causeInsanityCd"], cdMin, cdMax, icon.causeInsanity, true, color.causeInsanityCd)
++	end
++end
++
+ function module:CauseInsanity(rest)
+ 	self:RemoveBar(L["bar_causeInsanityCd"])
++	causeInsanityTime = GetTime()
+ 
+ 	if rest == "Grounded!" then
+ 		self:Bar("Grounded -" .. L["bar_causeInsanity"], timer.causeInsanityDur, icon.causeInsanity, true, color.causeInsanityDur)
+-		self:DelayedBar(timer.causeInsanityDur, L["bar_causeInsanityCd"], timer.causeInsanityCd, icon.causeInsanity, true, color.causeInsanityCd)
++		self:DelayedIntervalBar(timer.causeInsanityDur, L["bar_causeInsanityCd"], timer.causeInsanityCd[1] - timer.causeInsanityDur, timer.causeInsanityCd[2] - timer.causeInsanityDur, icon.causeInsanity, true, color.causeInsanityCd)
+ 	else
+ 		self:Bar(rest .. L["bar_causeInsanity"] .. " >Click Me<", timer.causeInsanityDur, icon.causeInsanity, true, color.causeInsanityDur)
+ 		self:SetCandyBarOnClick("BigWigsBar " .. rest .. L["bar_causeInsanity"] .. " >Click Me<", function(name, button, extra)
+@@ -575,7 +588,7 @@ function module:CauseInsanityFade(rest)
+ 		end
+ 	end
+ 
+-	self:Bar(L["bar_causeInsanityCd"], timer.causeInsanityCd, icon.causeInsanity, true, color.causeInsanityCd)
++	self:CauseInsanityCdBar()
+ 
+ 	if UnitClass("Player") == "Priest" then
+ 		self:WarningSign(icon.priestDispel, 0.7)
+diff --git a/Raids/ZG/Hazzarah.lua b/Raids/ZG/Hazzarah.lua
+index 8e4c734..a44a1e6 100644
+--- a/Raids/ZG/Hazzarah.lua
++++ b/Raids/ZG/Hazzarah.lua
+@@ -73,13 +73,11 @@ L:RegisterTranslations("zhCN", function() return {
+     c_nightmareillusion = "梦魇幻象",
+ } end )
+ local timer = {
+-	firstAdds = 21,
+-	adds = 24,
+-	
+-	firstSleepCd = 10,
+-	sleepCd = 18, --24 - 6sec afflic
++	firstAdds = {18,23}, --server urand(10,18) but logs show 20.0 / 22.1 on OctoWoW
++	adds = {15,25}, --server urand(15,25) (logs 20.3)
++	firstSleepCd = {10,18}, --server urand(10,18) (logs 13.7 / 14.1)
++	sleepCd = {6,14}, --server urand(12,20) minus 6sec afflic (Sleep is instant)
+ 	sleepAfflic = 6,
+-	
+ 	chainBurn = 60,
+ }
+ local icon = {
+@@ -140,11 +138,11 @@ function module:OnEngage()
+ 	addDeadCounter = 0
+ 	
+ 	if self.db.profile.sleep then
+-		self:Bar(L["bar_sleepCd"], timer.firstSleepCd, icon.sleep, true, color.sleep)
++		self:IntervalBar(L["bar_sleepCd"], timer.firstSleepCd[1], timer.firstSleepCd[2], icon.sleep, true, color.sleep)
+ 	end
+ 	
+ 	if self.db.profile.adds then
+-		self:Bar(L["bar_adds"], timer.firstAdds, icon.adds, true, color.adds)
++		self:IntervalBar(L["bar_adds"], timer.firstAdds[1], timer.firstAdds[2], icon.adds, true, color.adds)
+ 	end
+ end
+ 
+@@ -186,7 +184,7 @@ end
+ function module:AddsSpawn()
+ 	self:RemoveBar(L["bar_adds"])
+ 	
+-	self:Bar(L["bar_adds"], timer.adds, icon.adds, true, color.adds)
++	self:IntervalBar(L["bar_adds"], timer.adds[1], timer.adds[2], icon.adds, true, color.adds)
+ 	self:Message(L["msg_addsSpawn"], "Urgent", false, nil, false)
+ 	
+ 	self:TriggerEvent("BigWigs_StartCounterBar", self, L["bar_addsCounter"], 3, "Interface\\Icons\\"..icon.adds, true, color.addsCounter)
+@@ -218,7 +216,7 @@ function module:Sleep()
+ 		self:WarningSign(icon.tremor, 1)
+ 	end
+ 	
+-	self:DelayedBar(timer.sleepAfflic, L["bar_sleepCd"], timer.sleepCd, icon.sleep, true, color.sleep)
++	self:DelayedIntervalBar(timer.sleepAfflic, L["bar_sleepCd"], timer.sleepCd[1], timer.sleepCd[2], icon.sleep, true, color.sleep)
+ end
+ 
+ function module:ChainBurn()
+diff --git a/Raids/ZG/Jeklik.lua b/Raids/ZG/Jeklik.lua
+index 714f37a..f808249 100644
+--- a/Raids/ZG/Jeklik.lua
++++ b/Raids/ZG/Jeklik.lua
+@@ -181,19 +181,20 @@ L:RegisterTranslations("zhCN", function() return {
+ } end )
+ local timer = {
+ 	healCast = 4,
+-	healCd = 20,--need data
++	healFirstCd = 20,--server: first Great Heal 20s after phase 2 starts (logs 20.0 - 20.3)
++	healCd = {20,25},--server urand(20,25)
+ 
+-	firstTerrifyingScreechCd = 18,--need data
+-	terrifyingScreechCd = 30,--need data
++	firstTerrifyingScreechCd = 12,--server: 12s after phase 2 starts (logs 11.9 - 12.0); no Screech in phase 1
++	terrifyingScreechCd = 30,--server: 30s
+ 	psychicScreamCd = 39.5,--need data
+ 	
+ 	mindflay = 25,--need data
+ 	
+ 	firstSilence = 12,--need data
+-	silenceCd = 10,--20cd -10afflicted
++	silenceCd = {10,14},--server urand(20,24) - 10 afflicted (logs 20.2)
+ 	silenceAfflicted = 10,
+ 	
+-	swarm = 45,--need data
++	swarm = 40,--server: first bat swarm 40s after pull (phase 1 only), then 65s
+ }
+ local icon = {
+ 	heal = "Spell_Holy_Heal",
+@@ -285,10 +286,6 @@ function module:OnEngage()
+ 	castingHeal = nil
+ 	castingMindFlay = nil
+ 	
+-	if self.db.profile.fear then
+-		self:Bar(L["bar_fearCd"], timer.firstTerrifyingScreechCd, icon.terrifyingScreech, true, color.fearCd)
+-	end
+-	
+ 	if self.db.profile.silence then
+ 		self:Bar(L["bar_silenceCd"], timer.firstSilence, icon.silence, true, color.silenceCd)
+ 	end
+@@ -375,7 +372,9 @@ end
+ 
+ function module:Heal()
+ 	castingHeal = true
++	self:RemoveBar(L["bar_healCd"])
+ 	self:Bar(L["bar_healCast"], timer.healCast, icon.heal, true, color.healCast)
++	self:IntervalBar(L["bar_healCd"], timer.healCd[1], timer.healCd[2], icon.heal, true, color.healCd)
+ 	self:Message(L["msg_healCast"], "Positive", false, nil, false)
+ 	
+ 	if UnitClass("Player") == "Mage" then
+@@ -434,7 +433,7 @@ end
+ 
+ function module:Silence()
+ 	self:Bar(L["bar_silenceAfflicted"], timer.silenceAfflicted, icon.silence, true, color.silenceAfflicted)
+-	self:DelayedBar(timer.silenceAfflicted, L["bar_silenceCd"], timer.silenceCd, icon.silence, true, color.silenceCd)
++	self:DelayedIntervalBar(timer.silenceAfflicted, L["bar_silenceCd"], timer.silenceCd[1], timer.silenceCd[2], icon.silence, true, color.silenceCd)
+ end
+ 
+ function module:Swarm()
+@@ -454,4 +453,12 @@ function module:Phase()
+ 		
+ 		self:CancelDelayedBar(L["bar_silenceCd"])
+ 	end
++	
++	-- phase 2 timers restart when she lands (server values, confirmed by logs)
++	if self.db.profile.fear then
++		self:Bar(L["bar_fearCd"], timer.firstTerrifyingScreechCd, icon.terrifyingScreech, true, color.fearCd)
++	end
++	if self.db.profile.heal then
++		self:Bar(L["bar_healCd"], timer.healFirstCd, icon.heal, true, color.healCd)
++	end
+ end
+diff --git a/Raids/ZG/Jindo.lua b/Raids/ZG/Jindo.lua
+index 1509905..1798d2b 100644
+--- a/Raids/ZG/Jindo.lua
++++ b/Raids/ZG/Jindo.lua
+@@ -38,6 +38,8 @@ L:RegisterTranslations("enUS", function()
+ 		trigger_hexOther = "(.+) is afflicted by Hex.", --CHAT_MSG_SPELL_PERIODIC_FRIENDLYPLAYER_DAMAGE // CHAT_MSG_SPELL_PERIODIC_PARTY_DAMAGE
+ 		trigger_hexFade = "Hex fades from (.+).", ----CHAT_MSG_SPELL_AURA_GONE_OTHER // CHAT_MSG_SPELL_AURA_GONE_PARTY // CHAT_MSG_SPELL_AURA_GONE_SELF
+ 		bar_hex = " Hexxed",
++		bar_brainWashCd = "Next Brain Wash Totem",
++		bar_healingWardCd = "Next Healing Ward",
+ 		msg_hex = " is Hexxed - Dispel!",
+ 
+ 		trigger_curseYou = "You are afflicted by Delusions of Jin'do.", --CHAT_MSG_SPELL_PERIODIC_SELF_DAMAGE
+@@ -114,6 +116,10 @@ L:RegisterTranslations("zhCN", function() return {
+ local timer = {
+ 	hexDuration = 5,
+ 	curseDuration = 20,
++	brainWashFirstCd = {10,20}, --server urand(10,20) (logs 15.3 - 18.3)
++	brainWashCd = {10,30}, --server urand(10,30) (logs 16.0 - 21.0)
++	healingWardFirstCd = {20,30}, --server urand(20,30) (logs 22.2 - 25.3)
++	healingWardCd = {20,30}, --server urand(20,30)
+ }
+ local icon = {
+ 	hex = "Spell_Nature_Polymorph",
+@@ -124,6 +130,8 @@ local icon = {
+ local color = {
+ 	hex = "Green",
+ 	curse = "Blue",
++	brainWashCd = "Red",
++	healingWardCd = "Yellow",
+ }
+ local syncName = {
+ 	hex = "JindoHexStart" .. module.revision,
+@@ -166,6 +174,12 @@ function module:OnSetup()
+ end
+ 
+ function module:OnEngage()
++	if self.db.profile.brainwash then
++		self:IntervalBar(L["bar_brainWashCd"], timer.brainWashFirstCd[1], timer.brainWashFirstCd[2], icon.brainWash, true, color.brainWashCd)
++	end
++	if self.db.profile.healingward then
++		self:IntervalBar(L["bar_healingWardCd"], timer.healingWardFirstCd[1], timer.healingWardFirstCd[2], icon.healingWard, true, color.healingWardCd)
++	end
+ end
+ 
+ function module:OnDisengage()
+@@ -259,6 +273,7 @@ function module:HexFade(rest)
+ end
+ 
+ function module:BrainWash()
++	self:IntervalBar(L["bar_brainWashCd"], timer.brainWashCd[1], timer.brainWashCd[2], icon.brainWash, true, color.brainWashCd)
+ 	self:WarningSign(icon.brainWash, 0.7)
+ 	self:Message(L["msg_brainWash"], "Attention", false, nil, false)
+ 	self:Sound("Alarm")
+@@ -287,6 +302,7 @@ function module:BrainWash()
+ end
+ 
+ function module:HealingWard()
++	self:IntervalBar(L["bar_healingWardCd"], timer.healingWardCd[1], timer.healingWardCd[2], icon.healingWard, true, color.healingWardCd)
+ 	self:WarningSign(icon.healingWard, 0.7)
+ 	self:Message(L["msg_healingWard"], "Attention", false, nil, false)
+ 	self:Sound("Alarm")
+diff --git a/Raids/ZG/Mandokir.lua b/Raids/ZG/Mandokir.lua
+index f9274b7..afefda3 100644
+--- a/Raids/ZG/Mandokir.lua
++++ b/Raids/ZG/Mandokir.lua
+@@ -142,7 +142,7 @@ local timer = {
+ 	
+ 	whirlwindFirstCd = 20,
+ 	whirlwindCast = 2,
+-	whirlwindCd = 18,
++	whirlwindCd = {17,20}, --after the 2s cast; logs cast-to-cast 19.0 - 22.1 (median 20.9)
+ 	
+ 	chargeFirstCd = 15.8,
+ 	chargeCd = {30,35},
+@@ -375,7 +375,7 @@ function module:Whirlwind()
+ 	
+ 	self:Bar(L["bar_whirlwindCast"], timer.whirlwindCast, icon.whirlwind, true, color.whirlwindCast)
+ 	
+-	self:DelayedBar(timer.whirlwindCast, L["bar_whirlwindCd"], timer.whirlwindCd, icon.whirlwind, true, color.whirlwindCd)
++	self:DelayedIntervalBar(timer.whirlwindCast, L["bar_whirlwindCd"], timer.whirlwindCd[1], timer.whirlwindCd[2], icon.whirlwind, true, color.whirlwindCd)
+ end
+ 
+ function module:Charge()
+-- 
+2.43.0
+

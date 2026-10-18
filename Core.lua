@@ -481,6 +481,10 @@ function BigWigs.modulePrototype:Disengage()
 
 		self:RemoveProximity()
 
+		if BigWigsWorldMarkers then
+			BigWigsWorldMarkers:OnFightEnd(self)
+		end
+
 		if self.initialPlayerMarks then
 			for player in pairs(self.initialPlayerMarks) do
 				self:RestoreInitialRaidTargetForPlayer(player)
@@ -986,6 +990,35 @@ function BigWigs.modulePrototype:Icon(name, iconnumber)
 end
 function BigWigs.modulePrototype:RemoveIcon()
 	self:TriggerEvent("BigWigs_RemoveRaidIcon")
+end
+
+-- World Markers (worldmarkers.dll, see Plugins/WorldMarkers.lua)
+-- index: 1 blue square, 2 green triangle, 3 purple diamond, 4 red cross, 5 yellow star
+-- self:WorldMarker(index, unit) or self:WorldMarker(index, x, y, z)
+function BigWigs.modulePrototype:WorldMarker(index, a, b, c)
+	if BigWigsWorldMarkers then
+		return BigWigsWorldMarkers:Place(self, index, a, b, c)
+	end
+end
+-- same, cleared automatically after `duration` seconds
+function BigWigs.modulePrototype:TimedWorldMarker(duration, index, a, b, c)
+	if BigWigsWorldMarkers then
+		return BigWigsWorldMarkers:PlaceTimed(self, duration, index, a, b, c)
+	end
+end
+function BigWigs.modulePrototype:ClearWorldMarker(index)
+	if BigWigsWorldMarkers then
+		BigWigsWorldMarkers:Clear(self, index)
+	end
+end
+function BigWigs.modulePrototype:ClearWorldMarkers()
+	if BigWigsWorldMarkers then
+		BigWigsWorldMarkers:ClearOwner(self)
+	end
+end
+-- true if this client would actually place markers (dll loaded, option on, allowed placer)
+function BigWigs.modulePrototype:CanPlaceWorldMarkers()
+	return BigWigsWorldMarkers and BigWigsWorldMarkers:CanPlace() or false
 end
 
 function BigWigs.modulePrototype:WarningSign(icon, duration, force, text)

@@ -74,9 +74,9 @@ L:RegisterTranslations("zhCN", function() return {
 } end )
 local timer = {
 	firstAdds = {18,23}, --server urand(10,18) but logs show 20.0 / 22.1 on OctoWoW
-	adds = {15,25}, --server urand(15,25) (logs 20.3)
+	adds = {18,25}, --server urand(15,25); public logs 20.8 - 23.4
 	firstSleepCd = {10,18}, --server urand(10,18) (logs 13.7 / 14.1)
-	sleepCd = {6,14}, --server urand(12,20) minus 6sec afflic (Sleep is instant)
+	sleepCd = {17,19}, --OctoWoW: 23.2 - 23.7s cast-to-cast in public logs (server script says 12-20), minus 6sec afflic
 	sleepAfflic = 6,
 	chainBurn = 60,
 }

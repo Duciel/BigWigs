@@ -144,7 +144,7 @@ local timer = {
 	whirlwindCast = 2,
 	whirlwindCd = {17,20}, --after the 2s cast; logs cast-to-cast 19.0 - 22.1 (median 20.9)
 	
-	chargeFirstCd = 15.8,
+	chargeFirstCd = 14, --public logs: 13.1 - 14.7 (p10-p90, 72 kills)
 	chargeCd = {30,35},
 	
 	enrage = 90,

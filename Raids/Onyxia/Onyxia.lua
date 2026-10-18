@@ -71,8 +71,8 @@ L:RegisterTranslations("zhCN", function() return {
 } end )
 local timer = {
 	firstFear = 5, --yell -> landing roar (instant, no cast bar) ~5-7s
-	afterLandingFear = {18,33}, --server: urand(15,30) after the landing roar + ~3s landing (logs 18.9, 29.2)
-	fear = {15,30}, --server: urand(15,30) cast-to-cast (logs 15.8, 16.0, 17.9, 27.4)
+	afterLandingFear = {16,31}, --landing roar -> first cast fear: 16.4 - 30.7 (48 public kills)
+	fear = {15,30}, --server: urand(15,30) cast-to-cast; public logs 14.9 - 29.8 (133 samples)
 	fearCast = 1.5,
 	wingbuffet = 1,
 }

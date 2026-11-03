@@ -73,8 +73,8 @@ local timer = {
 	mcCast = 2,
 	mc = 15,
 	
-	shadowShockFirstCd = {5,10}, --6
-	shadowShockCd = {10,20}, --12
+	shadowShockFirstCd = {5,6}, --server: 6s after pull (logs 4.3 - 5.4)
+	shadowShockCd = {6,6.5}, --server: repeats every 6s (logs: 6.0 every time)
 }
 local icon = {
 	curse = "Spell_Shadow_BlackPlague",

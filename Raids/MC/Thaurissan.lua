@@ -2,7 +2,7 @@ local module, L = BigWigs:ModuleDeclaration("Sorcerer-Thane Thaurissan", "Molten
 
 module.revision = 30003
 module.enabletrigger = module.translatedName
-module.toggleoptions = { "runetimers", "runeofdetonation", "runeofcombustion", "floorwarn", "bosskill" }
+module.toggleoptions = { "runetimers", "runeofdetonation", "runeofcombustion", "barrage", "floorwarn", "bosskill" }
 module.zonename = {
 	AceLibrary("AceLocale-2.2"):new("BigWigs")["Molten Core"],
 	AceLibrary("Babble-Zone-2.2")["Molten Core"],
@@ -19,6 +19,10 @@ L:RegisterTranslations("enUS", function() return {
 	runetimers_cmd = "runetimers",
 	runetimers_name = "Rune Timers",
 	runetimers_desc = "Warns about incoming and ongoing Rune of Detonation and Rune of Combustion",
+
+	barrage_cmd = "barrage",
+	barrage_name = "Arcane Barrage Timer",
+	barrage_desc = "Timer for Arcane Barrage (knocks back a random raid member)",
 
 	runeofdetonation_cmd = "runeofdetonation",
 	runeofdetonation_name = "Rune of Detonation Alert",
@@ -53,6 +57,8 @@ L:RegisterTranslations("enUS", function() return {
 	warn_combustion = "GET_IN",
 
 	msg_floorwarn = "Floor Zone moving soon! %s%%",
+	trigger_barrage = "^Sorcerer%-Thane Thaurissan's Arcane Barrage", -- excludes the Image's barrage
+	bar_barrage = "Arcane Barrage (knockback)",
 } end)
 
 local hasRuneOfDetonation = false
@@ -64,17 +70,27 @@ local floorWarn = 3 -- how many % of HP before the recast the warning triggers
 local timer = {
 	runeCooldown = { 18, 22 }, -- average of 20
 	runeDuration = 6,
+	-- Arcane Barrage (52723), knockback on a random attacker. Public OctoWoW logs (69 kills):
+	barrageFirst = { 9.5, 12 }, -- 1st: 9.7 - 11.7s after pull
+	barrageSecond = { 16, 18 }, -- 2nd: 16.2 - 17.8s after the 1st (lands 7-10s after the 1st rune)
+	barrageAfterFirstRune = { 6.5, 10 },
+	barrageAfterRune = 6, -- 3rd+: 6.0s after every rune cast (110 of 143), i.e. when the rune explodes
 }
+local runeCount = 0
+local barrageCount = 0
 local icon = {
+	barrage = "spell_arcane_starfire",
 	runeDetonation = "Spell_Shadow_Teleport",
 	runeCombustion = "Spell_Fire_SealOfFire",
 }
 local color = {
+	barrage = "Magenta",
 	runeDetonation = "Blue",
 	runeCombustion = "Orange",
 	runeUpcoming = "Gray",
 }
 local syncName = {
+	barrage = "MCThaurissanBarrage" .. module.revision,
 	runeDetonation = "MCThaurissanDetonation" .. module.revision,
 	runeCombustion = "MCThaurissanCombusion" .. module.revision,
 }
@@ -84,9 +100,13 @@ function module:OnEnable()
 	self:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_PARTY_DAMAGE", "Event")
 	self:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_FRIENDLYPLAYER_DAMAGE", "Event")
 	self:RegisterEvent("CHAT_MSG_SPELL_AURA_GONE_SELF", "Event")
+	self:RegisterEvent("CHAT_MSG_SPELL_CREATURE_VS_SELF_DAMAGE", "Event") -- trigger_barrage
+	self:RegisterEvent("CHAT_MSG_SPELL_CREATURE_VS_PARTY_DAMAGE", "Event") -- trigger_barrage
+	self:RegisterEvent("CHAT_MSG_SPELL_CREATURE_VS_CREATURE_DAMAGE", "Event") -- trigger_barrage
 
 	self:ThrottleSync(10, syncName.runeDetonation)
 	self:ThrottleSync(10, syncName.runeCombustion)
+	self:ThrottleSync(5, syncName.barrage)
 end
 
 function module:OnSetup()
@@ -102,11 +122,17 @@ function module:OnEngage()
 	hasRuneOfCombustion = false
 	nextFloorWarn = 75
 
+	runeCount = 0
+	barrageCount = 0
+
 	if self.db.profile.runetimers then
 		self:IntervalBar(L["bar_detonationNext"], timer.runeCooldown[1], timer.runeCooldown[2], icon.runeDetonation, true, color.runeUpcoming)
 	end
 	if self.db.profile.floorwarn then
 		self:ScheduleRepeatingEvent("ThaurissanHealthCheck", self.CheckHealth, 0.25, self)
+	end
+	if self.db.profile.barrage then
+		self:IntervalBar(L["bar_barrage"], timer.barrageFirst[1], timer.barrageFirst[2], icon.barrage, true, color.barrage)
 	end
 end
 
@@ -119,8 +145,11 @@ function module:OnDisengage()
 end
 
 function module:Event(msg)
+	if string.find(msg, L["trigger_barrage"]) then
+		self:Sync(syncName.barrage)
+
 	-- Rune of Detonation
-	if string.find(msg, L["trigger_detonation"]) then
+	elseif string.find(msg, L["trigger_detonation"]) then
 		self:Sync(syncName.runeDetonation)
 		if string.find(msg, L["trigger_you"]) then
 			hasRuneOfDetonation = true
@@ -168,10 +197,34 @@ function module:BigWigs_RecvSync(sync, rest, nick)
 		self:DetonationCast()
 	elseif sync == syncName.runeCombustion then
 		self:CombustionCast()
+	elseif sync == syncName.barrage then
+		self:Barrage()
+	end
+end
+
+function module:Barrage()
+	barrageCount = barrageCount + 1
+	self:RemoveBar(L["bar_barrage"])
+	if self.db.profile.barrage and barrageCount == 1 then
+		self:IntervalBar(L["bar_barrage"], timer.barrageSecond[1], timer.barrageSecond[2], icon.barrage, true, color.barrage)
+	end
+	-- later barrages are timed from the rune casts (see RuneCast)
+end
+
+function module:RuneCast()
+	runeCount = runeCount + 1
+	if not self.db.profile.barrage then return end
+	if runeCount == 1 then
+		if barrageCount == 0 then -- only if the 1st barrage was missed; otherwise keep its 16-18s bar
+			self:IntervalBar(L["bar_barrage"], timer.barrageAfterFirstRune[1], timer.barrageAfterFirstRune[2], icon.barrage, true, color.barrage)
+		end
+	else
+		self:Bar(L["bar_barrage"], timer.barrageAfterRune, icon.barrage, true, color.barrage)
 	end
 end
 
 function module:CombustionCast()
+	self:RuneCast()
 	-- remove CD bar in case of early cast
 	self:RemoveBar(L["bar_combustionNext"])
 	if self.db.profile.runetimers then
@@ -183,6 +236,7 @@ function module:CombustionCast()
 end
 
 function module:DetonationCast()
+	self:RuneCast()
 	-- remove CD bar in case of early cast
 	self:RemoveBar(L["bar_detonationNext"])
 	if self.db.profile.runetimers then

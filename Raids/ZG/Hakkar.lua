@@ -218,7 +218,7 @@ L:RegisterTranslations("zhCN", function() return {
 local timer = {
 	causeInsanityFirstCd = 17,
 	causeInsanityDur = 10,
-	causeInsanityCd = 11,
+	causeInsanityCd = {20,25}, --server urand(20,25) cast-to-cast (logs 20.4 - 24.3)
 
 	bloodSiphonCd = 90,
 	bloodSiphonDur = 8,
@@ -536,12 +536,25 @@ function module:BigWigs_RecvSync(sync, rest, nick)
 	end
 end
 
+local causeInsanityTime = 0
+function module:CauseInsanityCdBar()
+	-- the cooldown runs from the cast, not from the fade (MC is often broken early)
+	local elapsed = GetTime() - causeInsanityTime
+	local cdMin = timer.causeInsanityCd[1] - elapsed
+	local cdMax = timer.causeInsanityCd[2] - elapsed
+	if cdMax > 0 then
+		if cdMin < 0.1 then cdMin = 0.1 end
+		self:IntervalBar(L["bar_causeInsanityCd"], cdMin, cdMax, icon.causeInsanity, true, color.causeInsanityCd)
+	end
+end
+
 function module:CauseInsanity(rest)
 	self:RemoveBar(L["bar_causeInsanityCd"])
+	causeInsanityTime = GetTime()
 
 	if rest == "Grounded!" then
 		self:Bar("Grounded -" .. L["bar_causeInsanity"], timer.causeInsanityDur, icon.causeInsanity, true, color.causeInsanityDur)
-		self:DelayedBar(timer.causeInsanityDur, L["bar_causeInsanityCd"], timer.causeInsanityCd, icon.causeInsanity, true, color.causeInsanityCd)
+		self:DelayedIntervalBar(timer.causeInsanityDur, L["bar_causeInsanityCd"], timer.causeInsanityCd[1] - timer.causeInsanityDur, timer.causeInsanityCd[2] - timer.causeInsanityDur, icon.causeInsanity, true, color.causeInsanityCd)
 	else
 		self:Bar(rest .. L["bar_causeInsanity"] .. " >Click Me<", timer.causeInsanityDur, icon.causeInsanity, true, color.causeInsanityDur)
 		self:SetCandyBarOnClick("BigWigsBar " .. rest .. L["bar_causeInsanity"] .. " >Click Me<", function(name, button, extra)
@@ -575,7 +588,7 @@ function module:CauseInsanityFade(rest)
 		end
 	end
 
-	self:Bar(L["bar_causeInsanityCd"], timer.causeInsanityCd, icon.causeInsanity, true, color.causeInsanityCd)
+	self:CauseInsanityCdBar()
 
 	if UnitClass("Player") == "Priest" then
 		self:WarningSign(icon.priestDispel, 0.7)

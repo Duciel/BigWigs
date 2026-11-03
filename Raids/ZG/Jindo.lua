@@ -38,6 +38,8 @@ L:RegisterTranslations("enUS", function()
 		trigger_hexOther = "(.+) is afflicted by Hex.", --CHAT_MSG_SPELL_PERIODIC_FRIENDLYPLAYER_DAMAGE // CHAT_MSG_SPELL_PERIODIC_PARTY_DAMAGE
 		trigger_hexFade = "Hex fades from (.+).", ----CHAT_MSG_SPELL_AURA_GONE_OTHER // CHAT_MSG_SPELL_AURA_GONE_PARTY // CHAT_MSG_SPELL_AURA_GONE_SELF
 		bar_hex = " Hexxed",
+		bar_brainWashCd = "Next Brain Wash Totem",
+		bar_healingWardCd = "Next Healing Ward",
 		msg_hex = " is Hexxed - Dispel!",
 
 		trigger_curseYou = "You are afflicted by Delusions of Jin'do.", --CHAT_MSG_SPELL_PERIODIC_SELF_DAMAGE
@@ -114,6 +116,10 @@ L:RegisterTranslations("zhCN", function() return {
 local timer = {
 	hexDuration = 5,
 	curseDuration = 20,
+	brainWashFirstCd = {10,20}, --server urand(10,20) (logs 15.3 - 18.3)
+	brainWashCd = {10,30}, --server urand(10,30) (logs 16.0 - 21.0)
+	healingWardFirstCd = {20,30}, --server urand(20,30) (logs 22.2 - 25.3)
+	healingWardCd = {20,30}, --server urand(20,30)
 }
 local icon = {
 	hex = "Spell_Nature_Polymorph",
@@ -124,6 +130,8 @@ local icon = {
 local color = {
 	hex = "Green",
 	curse = "Blue",
+	brainWashCd = "Red",
+	healingWardCd = "Yellow",
 }
 local syncName = {
 	hex = "JindoHexStart" .. module.revision,
@@ -166,6 +174,12 @@ function module:OnSetup()
 end
 
 function module:OnEngage()
+	if self.db.profile.brainwash then
+		self:IntervalBar(L["bar_brainWashCd"], timer.brainWashFirstCd[1], timer.brainWashFirstCd[2], icon.brainWash, true, color.brainWashCd)
+	end
+	if self.db.profile.healingward then
+		self:IntervalBar(L["bar_healingWardCd"], timer.healingWardFirstCd[1], timer.healingWardFirstCd[2], icon.healingWard, true, color.healingWardCd)
+	end
 end
 
 function module:OnDisengage()
@@ -259,6 +273,7 @@ function module:HexFade(rest)
 end
 
 function module:BrainWash()
+	self:IntervalBar(L["bar_brainWashCd"], timer.brainWashCd[1], timer.brainWashCd[2], icon.brainWash, true, color.brainWashCd)
 	self:WarningSign(icon.brainWash, 0.7)
 	self:Message(L["msg_brainWash"], "Attention", false, nil, false)
 	self:Sound("Alarm")
@@ -287,6 +302,7 @@ function module:BrainWash()
 end
 
 function module:HealingWard()
+	self:IntervalBar(L["bar_healingWardCd"], timer.healingWardCd[1], timer.healingWardCd[2], icon.healingWard, true, color.healingWardCd)
 	self:WarningSign(icon.healingWard, 0.7)
 	self:Message(L["msg_healingWard"], "Attention", false, nil, false)
 	self:Sound("Alarm")

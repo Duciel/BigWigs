@@ -336,7 +336,7 @@ local timer = {
 	phase2 = 15, --15sec from thekal's death, not from all 3 dead
 	
 	forcePunchFirst = 5,
-	forcePunch = {12,18}, --saw 12,18
+	forcePunch = {16,20}, --server urand(16,21); public logs 16.5 - 19.4 (p10-p90, 17 samples)
 	charge = {12,18}, --saw 13,15,18
 	frenzy = 10, --is 8 or 10 depending on bosses
 	addsFirst = 25,

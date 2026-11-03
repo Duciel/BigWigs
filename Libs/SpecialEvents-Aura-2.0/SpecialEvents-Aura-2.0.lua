@@ -1,6 +1,6 @@
 --[[
 Name: SpecialEvents-Aura-2.0
-Revision: $Rev: 14863 $
+Revision: $Rev: 14864 $
 Author: Tekkub Stoutwrithe (tekkub@gmail.com)
 Website: http://www.wowace.com/
 Description: Special events for Aura's, (de)buffs gained, lost etc.
@@ -8,7 +8,7 @@ Dependencies: AceLibrary, AceEvent-2.0, Gratuity-2.0
 ]]
 
 
-local vmajor, vminor = "SpecialEvents-Aura-2.0", "$Revision: 14863 $"
+local vmajor, vminor = "SpecialEvents-Aura-2.0", "$Revision: 14864 $"
 
 if not AceLibrary then error(vmajor .. " requires AceLibrary.") end
 if not AceLibrary:HasInstance("AceEvent-2.0") then error(vmajor .. " requires AceEvent-2.0.") end
@@ -20,6 +20,29 @@ AceLibrary("AceEvent-2.0"):embed(lib)
 local gratuity = AceLibrary("Gratuity-2.0")
 local RL
 local debuffTextureCache = {}
+
+-- Performance: only scan auras while someone listens to our events.
+-- Scanning every UNIT_AURA of a 40-man raid (with tooltip scans for the
+-- player) is expensive, and in BigWigs only the Naxxramas ZombieFood plugin
+-- consumes these events. While nobody listens, the cache is marked stale and
+-- query methods rescan the requested unit on demand.
+local LISTENED_EVENTS = {
+	"SpecialEvents_UnitBuffGained", "SpecialEvents_UnitBuffLost",
+	"SpecialEvents_UnitDebuffGained", "SpecialEvents_UnitDebuffLost",
+	"SpecialEvents_PlayerBuffGained", "SpecialEvents_PlayerBuffLost",
+	"SpecialEvents_PlayerDebuffGained", "SpecialEvents_PlayerDebuffLost",
+	"SpecialEvents_AuraTargetChanged", "SpecialEvents_AuraRaidRosterUpdate",
+	"SpecialEvents_AuraPartyMembersChanged",
+}
+local function hasListeners()
+	local registry = AceLibrary("AceEvent-2.0").registry
+	if type(registry) ~= "table" then return true end
+	for _, event in ipairs(LISTENED_EVENTS) do
+		local listeners = registry[event]
+		if listeners and next(listeners) then return true end
+	end
+	return false
+end
 local buffTextureCache = {}
 
 local table_setn
@@ -82,8 +105,8 @@ end
 
 local function registerevents(self)
 	self:RegisterEvent("PLAYER_LEAVING_WORLD")
-	self:RegisterEvent("UNIT_AURA", "AuraScan")
-	self:RegisterEvent("UNIT_AURASTATE", "AuraScan")
+	self:RegisterEvent("UNIT_AURA", "OnUnitAura")
+	self:RegisterEvent("UNIT_AURASTATE", "OnUnitAura")
 	self:RegisterEvent("PLAYER_AURAS_CHANGED")
 	self:RegisterEvent("PLAYER_TARGET_CHANGED")
 	self:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -116,9 +139,27 @@ function activate(self, oldLib, oldDeactivate)
 end
 
 
+function lib:IsActive()
+	if hasListeners() then
+		if self.vars.stale then
+			self.vars.stale = nil
+			self:ScanAllAuras()
+		end
+		return true
+	end
+	self.vars.stale = true
+	return false
+end
+
+
 function lib:PLAYER_ENTERING_WORLD()
-	self:ScanAllAuras()
+	if self:IsActive() then self:ScanAllAuras() end
 	registerevents(self)
+end
+
+
+function lib:OnUnitAura(unit)
+	if self:IsActive() then self:AuraScan(unit or arg1) end
 end
 
 
@@ -136,6 +177,7 @@ end
 --------------------------------
 
 function lib:PLAYER_AURAS_CHANGED()
+	if not self:IsActive() then return end
 	self:AuraScan("player")
 	if GetNumRaidMembers() > 0 then
 		local u
@@ -148,12 +190,14 @@ end
 
 
 function lib:PLAYER_TARGET_CHANGED()
+	if not self:IsActive() then return end
 	self:AuraScan("target")
 	self:TriggerEvent("SpecialEvents_AuraTargetChanged")
 end
 
 
 function lib:RosterLib_UnitChanged(units)
+	if not self:IsActive() then return end
 	for unit in pairs(units) do
 		if unit and UnitExists(unit) then
 			self:AuraScan(unit)
@@ -168,6 +212,7 @@ end
 
 
 function lib:PARTY_MEMBERS_CHANGED()
+	if not self:IsActive() then return end
 	if UnitExists("pet") then self:AuraScan("pet") end
 
 	for i=1,4 do
@@ -179,6 +224,7 @@ end
 
 
 function lib:RAID_ROSTER_UPDATE()
+	if not self:IsActive() then return end
 	for i=1,40 do
 		if UnitExists("raid"..i) then self:AuraScan("raid"..i) end
 		if UnitExists("raidpet"..i) then self:AuraScan("raidpet"..i) end
@@ -331,12 +377,19 @@ end
 --      Query Methods      --
 -----------------------------
 
+-- rescan a unit on demand while the event-driven cache is stale
+local function refresh(self, unit)
+	if self.vars.stale and unit and UnitExists(unit) then self:AuraScan(unit) end
+end
+
 function lib:UnitHasBuff(targ, buff)
+	refresh(self, targ)
 	if self.vars.buffs[targ] then return self.vars.buffs[targ][buff] end
 end
 
 
 function lib:UnitHasDebuff(targ, debuff)
+	refresh(self, targ)
 	if self.vars.debuffs[targ] then
 		for i, v in pairs(self.vars.debuffs[targ]) do
 			if v[2] == debuff then
@@ -348,6 +401,7 @@ end
 
 
 function lib:UnitHasDebuffType(targ, debufftype)
+	refresh(self, targ)
 	if self.vars.debuffs[targ] then
 		for i,v in pairs(self.vars.debuffs[targ]) do
 			if v[4] == debufftype then return v end
@@ -357,6 +411,7 @@ end
 
 
 function lib:BuffIter(unitid)
+	refresh(self, unitid)
 	local f = function(unitid, i)
 		if not self.vars.buffs[unitid] then return end
 		local idx = next(self.vars.buffs[unitid], i)
@@ -367,6 +422,7 @@ function lib:BuffIter(unitid)
 end
 
 function lib:DebuffIter(unitid)
+	refresh(self, unitid)
 	local idx = nil
 	local f = function(unitid)
 		if not self.vars.debuffs[unitid] then return end

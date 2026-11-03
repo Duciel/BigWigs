@@ -96,7 +96,7 @@ L:RegisterTranslations("zhCN", function() return {
     you = "you",
 } end )
 local timer = {
-	reaverstormCd = 5.5,
+	reaverstormCd = {5,12.5}, --public logs: cast-to-cast 6.6 - 14.1 (p10-p90), minus 1.5s cast
 	reaverstormCast = 1.5,
 	boon = 15,--timer TBD
 	empoweredSoul = 10,
@@ -216,7 +216,7 @@ end
 function module:Reaverstorm()
 	self:RemoveBar(L["bar_reaverstormCd"])
 	self:Bar(L["bar_reaverstormCast"], timer.reaverstormCast, icon.reaverstorm, true, color.reaverstormCast)
-	self:DelayedBar(timer.reaverstormCast, L["bar_reaverstormCd"], timer.reaverstormCd, icon.reaverstorm, true, color.reaverstormCd)
+	self:DelayedIntervalBar(timer.reaverstormCast, L["bar_reaverstormCd"], timer.reaverstormCd[1], timer.reaverstormCd[2], icon.reaverstorm, true, color.reaverstormCd)
 end
 
 function module:Boon(rest)

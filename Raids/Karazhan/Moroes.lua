@@ -136,7 +136,7 @@ local timer = {
 	reflect = 5,
 	shuffleKick = 4,
 	dust = 10,
-	dust_cd = 20, -- 20-26
+	dust_cd = {21,26}, -- public logs: first Glittering Dust 21.1 - 25.7 (p10-p90, 46 kills)
 }
 local icon = {
 	p1 = "Inv_Misc_Pocketwatch_01",
@@ -206,7 +206,7 @@ end
 
 function module:OnEngage()
 	if self.db.profile.dust then
-		self:Bar(L["bar_dust_cd"], timer.dust_cd, icon.dust_cd, true, color.dust)
+		self:IntervalBar(L["bar_dust_cd"], timer.dust_cd[1], timer.dust_cd[2], icon.dust_cd, true, color.dust)
 	end
 end
 
